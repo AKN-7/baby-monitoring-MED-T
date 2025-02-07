@@ -23,7 +23,7 @@ PARENT_PHONE_NUMBER = os.environ.get("PARENT_PHONE_NUMBER")
 twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
 # Alert configuration (in seconds)
-DISTRESS_THRESHOLD = 10
+DISTRESS_THRESHOLD = 5
 
 # Global state for alerting
 distress_start = None
@@ -31,7 +31,7 @@ sms_sent = False
 
 def send_sms_alert(emotion, duration):
     message_body = (
-        f"Alert: Baby has been {emotion.lower()} for {duration:.1f} seconds. Please check on them."     #or just say the baby's distressed
+        f"Alert: Baby has been distressed for {duration:.1f} seconds. Please check on them."     #or just say the baby's distressed
     )
     try:
         twilio_client.messages.create(
