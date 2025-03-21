@@ -6,14 +6,21 @@ from flask import Flask, render_template, Response
 from transformers import AutoFeatureExtractor, AutoModelForImageClassification
 from PIL import Image
 from twilio.rest import Client
+import threading
+
+# Import the shared camera stream and face tracker modules
+from camera_stream import CameraStream
+from facetracker import face_tracker
 
 app = Flask(__name__)
 
-# --- Model and Camera Setup ---
+# --- Shared Camera Setup ---
+camera_stream = CameraStream(src=0).start()
+
+# --- Model Setup for Emotion Recognition ---
 model_name = "trpakov/vit-face-expression"
 feature_extractor = AutoFeatureExtractor.from_pretrained(model_name)
 model = AutoModelForImageClassification.from_pretrained(model_name)
-camera = cv2.VideoCapture(0)
 
 # --- Twilio Setup ---
 TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID")
@@ -31,7 +38,7 @@ sms_sent = False
 
 def send_sms_alert(emotion, duration):
     message_body = (
-        f"Alert: Baby has been distressed for {duration:.1f} seconds. Please check on them."     #or just say the baby's distressed
+        f"Alert: Baby has been {emotion.lower()} for {duration:.1f} seconds. Please check on them."
     )
     try:
         twilio_client.messages.create(
@@ -47,15 +54,15 @@ def gen_frames():
     global distress_start, sms_sent
 
     while True:
-        success, frame = camera.read()
-        if not success:
-            break
+        ret, frame = camera_stream.read()
+        if not ret or frame is None:
+            continue
 
-        # Convert frame to RGB and to PIL Image for model processing
+        # Convert frame to RGB and then to PIL Image for model processing
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pil_image = Image.fromarray(frame_rgb)
 
-        # Preprocess and infer emotion
+        # Preprocess and run emotion recognition
         inputs = feature_extractor(images=pil_image, return_tensors="pt")
         with torch.no_grad():
             outputs = model(**inputs)
@@ -63,8 +70,8 @@ def gen_frames():
         predicted_class_idx = logits.argmax(-1).item()
         predicted_label = model.config.id2label[predicted_class_idx]
 
-        # Check for distress emotions ("fear" or "sad") and alert if threshold exceeded
-        if predicted_label.lower() in ["fear", "sad"]:
+        # Check for distress emotions and trigger alert if needed
+        if predicted_label.lower() in ["fear", "sad", "happy", "surprised", "angry"]:
             if distress_start is None:
                 distress_start = time.time()
             else:
@@ -73,7 +80,6 @@ def gen_frames():
                     send_sms_alert(predicted_label, elapsed)
                     sms_sent = True
         else:
-            # Reset when a non-distress emotion is detected
             distress_start = None
             sms_sent = False
 
@@ -89,8 +95,8 @@ def gen_frames():
             cv2.LINE_AA
         )
 
-        # Encode as JPEG and yield for streaming
-        ret, buffer = cv2.imencode('.jpg', frame)
+        # Encode frame as JPEG for streaming
+        ret2, buffer = cv2.imencode('.jpg', frame)
         frame_bytes = buffer.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
@@ -104,5 +110,10 @@ def video_feed():
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == '__main__':
-    # Run on all interfaces; change port if needed
+    # Start the face tracker in a background thread, using the shared camera stream
+    face_tracker_thread = threading.Thread(target=face_tracker, args=(camera_stream,))
+    face_tracker_thread.daemon = True
+    face_tracker_thread.start()
+
+    # Run the Flask app
     app.run(host='0.0.0.0', port=5000, debug=True)
