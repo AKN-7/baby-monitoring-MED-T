@@ -45,7 +45,7 @@
         max-width: 90%;
         position: relative;
       }
-      .video-container img {
+      video {
         width: 100%;
         height: auto;
         display: block;
@@ -104,8 +104,8 @@
       <p>Real-Time Facial Emotion Recognition</p>
     </div>
 
-    <div class="video-container" id="videoContainer">
-      <img id="videoFeed" src="{{ url_for('video_feed') }}" alt="Live Video Stream">
+    <div class="video-container">
+      <video id="video" autoplay playsinline></video>
     </div>
 
     <div class="controls">
@@ -116,5 +116,37 @@
     </div>
 
     <div id="toast"></div>
+
+    <script>
+      const video = document.getElementById('video');
+      const toggleBtn = document.getElementById('toggleBtn');
+      let streamActive = true;
+      
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          video.srcObject = stream;
+        })
+        .catch(error => {
+          alert('Error accessing camera: ' + error.message);
+        });
+      
+      toggleBtn.addEventListener('click', () => {
+        if (streamActive) {
+          video.srcObject.getTracks().forEach(track => track.stop());
+          streamActive = false;
+          toggleBtn.textContent = 'Resume Stream';
+        } else {
+          navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+              video.srcObject = stream;
+              streamActive = true;
+              toggleBtn.textContent = 'Pause Stream';
+            })
+            .catch(error => {
+              alert('Error accessing camera: ' + error.message);
+            });
+        }
+      });
+    </script>
   </body>
 </html>
