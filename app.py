@@ -6,6 +6,7 @@ from flask import Flask, render_template, Response
 from transformers import AutoFeatureExtractor, AutoModelForImageClassification
 from PIL import Image
 from twilio.rest import Client
+from pantilthat import *
 
 app = Flask(__name__)
 
@@ -29,10 +30,14 @@ DISTRESS_THRESHOLD = 5
 distress_start = None
 sms_sent = False
 
+# Camera Movement Settings
+cam_pan = 90
+cam_tilt = 45
+pan(cam_pan - 90)
+tilt(cam_tilt - 90)
+
 def send_sms_alert(emotion, duration):
-    message_body = (
-        f"Alert: Baby has been distressed for {duration:.1f} seconds. Please check on them."     #or just say the baby's distressed
-    )
+    message_body = f"Alert: Baby has been distressed for {duration:.1f} seconds. Please check on them."
     try:
         twilio_client.messages.create(
             body=message_body,
@@ -44,14 +49,46 @@ def send_sms_alert(emotion, duration):
         print("Failed to send SMS:", e)
 
 def gen_frames():
-    global distress_start, sms_sent
+    global distress_start, sms_sent, cam_pan, cam_tilt
+
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
     while True:
         success, frame = camera.read()
         if not success:
             break
 
-        # Convert frame to RGB and to PIL Image for model processing
+        # Convert frame to grayscale for face detection
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=5, minSize=(30, 30))
+
+        midFace = None
+
+        for (x, y, w, h) in faces:
+            # Draw rectangle around detected face
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+
+            # Get face center
+            midFaceX = x + (w // 2)
+            midFaceY = y + (h // 2)
+            midFace = (midFaceX, midFaceY)
+
+            # Calculate offsets
+            offsetX = (midFaceX / (frame.shape[1] / 2)) - 1
+            offsetY = (midFaceY / (frame.shape[0] / 2)) - 1
+
+            # Adjust camera position
+            cam_pan -= int(offsetX * 5)
+            cam_tilt += int(offsetY * 5)
+            cam_pan = max(0, min(180, cam_pan))
+            cam_tilt = max(0, min(180, cam_tilt))
+
+            pan(cam_pan - 90)
+            tilt(cam_tilt - 90)
+
+            break  # Track only the first detected face
+
+        # Convert frame to RGB and prepare for model processing
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pil_image = Image.fromarray(frame_rgb)
 
@@ -104,5 +141,4 @@ def video_feed():
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == '__main__':
-    # Run on all interfaces; change port if needed
     app.run(host='0.0.0.0', port=5000, debug=True)
