@@ -21,7 +21,6 @@
         align-items: center;
         overflow-x: hidden;
       }
-      /* Preloader */
       #preloader {
         position: fixed;
         top: 0;
@@ -93,7 +92,6 @@
         border-radius: 3px;
         animation: loadProgress 2s ease-out forwards;
       }
-      /* Header */
       .header {
         width: 100%;
         padding: 50px 20px;
@@ -119,7 +117,6 @@
         font-weight: 300;
         opacity: 0.95;
       }
-      /* Main Container */
       .main-container {
         display: flex;
         flex-direction: row;
@@ -127,17 +124,18 @@
         gap: 20px;
         max-width: 90%;
       }
-      /* Video Container */
       .video-container {
         border: 8px solid #B5838D;
         border-radius: 30px;
         overflow: hidden;
         box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
         width: 720px;
+        height: 480px; /* Set a fixed height for consistency */
         background: #fff;
         opacity: 0;
         transform: scale(0.95);
         animation: fadeScale 0.8s ease forwards 0.6s;
+        position: relative;
       }
       .video-container:hover {
         transform: scale(1.03);
@@ -145,19 +143,29 @@
       }
       .video-feed {
         width: 100%;
-        height: auto;
+        height: 100%;
         display: block;
+        object-fit: cover; /* Ensure the video feed fits the container */
       }
-      /* Controls */
+      .video-error {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #ff0000;
+        font-size: 1.2rem;
+        text-align: center;
+        display: none;
+      }
       .controls {
         display: flex;
         flex-direction: column;
-        gap: 25px; /* Increased spacing between buttons */
+        gap: 25px;
         opacity: 0;
         animation: fadeIn 0.8s ease forwards 0.9s;
       }
       .controls button {
-        background: #D8BFD8; /* Solid lilac color */
+        background: #D8BFD8;
         border: none;
         color: #6C5B7B;
         padding: 16px 28px;
@@ -172,7 +180,7 @@
         min-width: 170px;
         text-transform: uppercase;
         letter-spacing: 1.5px;
-        border: 2px solid rgba(255, 255, 255, 0.2); /* Subtle border */
+        border: 2px solid rgba(255, 255, 255, 0.2);
       }
       .controls button::before {
         content: '';
@@ -185,7 +193,7 @@
         transition: all 0.6s ease;
       }
       .controls button::after {
-        content: '✨'; /* Sparkle effect */
+        content: '✨';
         position: absolute;
         top: 50%;
         right: 10px;
@@ -201,7 +209,7 @@
         opacity: 1;
       }
       .controls button:hover {
-        background: #C9A0DC; /* Slightly brighter lilac on hover */
+        background: #C9A0DC;
         transform: translateY(-5px) scale(1.05);
         box-shadow: 0 12px 35px rgba(75, 0, 130, 0.5), 0 0 25px rgba(216, 191, 216, 0.4);
       }
@@ -209,7 +217,6 @@
         transform: translateY(0) scale(1);
         box-shadow: 0 5px 15px rgba(75, 0, 130, 0.3), 0 0 15px rgba(216, 191, 216, 0.2);
       }
-      /* Toast */
       #toast {
         visibility: hidden;
         min-width: 300px;
@@ -230,7 +237,6 @@
         visibility: visible;
         animation: fadein 0.5s, fadeout 0.5s 2.5s;
       }
-      /* Animations */
       @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
@@ -264,7 +270,6 @@
         from { bottom: 50px; opacity: 1; }
         to { bottom: 0; opacity: 0; }
       }
-      /* Responsive */
       @media (max-width: 900px) {
         .main-container {
           flex-direction: column;
@@ -274,10 +279,11 @@
           flex-direction: row;
           flex-wrap: wrap;
           justify-content: center;
-          gap: 15px; /* Reduced gap for horizontal layout on smaller screens */
+          gap: 15px;
         }
         .video-container {
           width: 90%;
+          height: auto;
         }
       }
       @media (max-width: 600px) {
@@ -299,7 +305,6 @@
     </style>
   </head>
   <body>
-    <!-- Preloader -->
     <div id="preloader">
       <div class="loader-container">
         <div class="loader-text">Emotion Monitor</div>
@@ -321,6 +326,7 @@
     <div class="main-container">
       <div class="video-container">
         <img id="videoFeed" class="video-feed" src="{{ url_for('video_feed') }}" alt="Video Feed">
+        <div id="videoError" class="video-error">Failed to load video feed. Please check your camera.</div>
       </div>
       <div class="controls">
         <button id="captureBtn">Capture Snapshot</button>
@@ -340,6 +346,18 @@
           preloader.classList.add('hidden');
         }, 2500);
       });
+
+      // Check if video feed loads
+      const videoFeed = document.getElementById('videoFeed');
+      const videoError = document.getElementById('videoError');
+      videoFeed.onerror = () => {
+        videoError.style.display = 'block';
+        videoFeed.style.display = 'none';
+      };
+      videoFeed.onload = () => {
+        videoError.style.display = 'none';
+        videoFeed.style.display = 'block';
+      };
 
       // Toast notification function
       function showToast(message) {
@@ -399,11 +417,11 @@
         const videoContainer = document.querySelector('.video-container');
         if (videoContainer.requestFullscreen) {
           videoContainer.requestFullscreen();
-        } else if (videoContainer.mozRequestFullScreen) { /* Firefox */
+        } else if (videoContainer.mozRequestFullScreen) {
           videoContainer.mozRequestFullScreen();
-        } else if (videoContainer.webkitRequestFullscreen) { /* Chrome, Safari and Opera */
+        } else if (videoContainer.webkitRequestFullscreen) {
           videoContainer.webkitRequestFullscreen();
-        } else if (videoContainer.msRequestFullscreen) { /* IE/Edge */
+        } else if (videoContainer.msRequestFullscreen) {
           videoContainer.msRequestFullscreen();
         }
         showToast('Entered Fullscreen');
