@@ -4,43 +4,44 @@
     <meta charset="UTF-8">
     <title>Baby-Monitoring System - Real-Time Facial Emotion Recognition</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Inline CSS for a sleek, modern look -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
-      /* Overall page styling */
       body {
-        background-color: #f4f7f6;
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background-color: #F5E6FE;
+        font-family: 'Poppins', sans-serif;
         margin: 0;
         padding: 0;
         display: flex;
         flex-direction: column;
         align-items: center;
       }
-      /* Header styling with product title */
       .header {
         width: 100%;
-        padding: 20px;
-        background-color: #2c3e50;
+        padding: 30px;
+        background: linear-gradient(135deg, #6C5B7B, #C06C84);
         color: white;
         text-align: center;
+        border-bottom-left-radius: 50px;
+        border-bottom-right-radius: 50px;
       }
       .header h1 {
         margin: 0;
-        font-size: 2rem;
+        font-size: 2.5rem;
+        font-family: 'Playfair Display', serif;
+        letter-spacing: 1px;
       }
       .header p {
         margin: 5px 0 0;
-        font-size: 1.1rem;
+        font-size: 1.2rem;
         opacity: 0.9;
       }
-      /* Video container with a cool border and drop shadow */
       .video-container {
         margin-top: 30px;
-        border: 5px solid #3498db;
-        border-radius: 10px;
+        border: 5px solid #B5838D;
+        border-radius: 20px;
         overflow: hidden;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        width: 640px; /* scales down the video feed */
+        box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        width: 640px;
         max-width: 90%;
         position: relative;
       }
@@ -49,33 +50,32 @@
         height: auto;
         display: block;
       }
-      /* Controls styling */
       .controls {
         margin-top: 20px;
         text-align: center;
       }
       .controls button {
-        background-color: #3498db;
+        background: linear-gradient(135deg, #8E44AD, #9B59B6);
         border: none;
         color: white;
-        padding: 10px 20px;
+        padding: 12px 24px;
         font-size: 1rem;
-        margin: 5px 10px;
-        border-radius: 5px;
+        margin: 8px;
+        border-radius: 8px;
         cursor: pointer;
-        transition: background-color 0.3s ease;
+        transition: background 0.3s ease, transform 0.2s;
       }
       .controls button:hover {
-        background-color: #2980b9;
+        background: linear-gradient(135deg, #732D91, #8D44AC);
+        transform: scale(1.05);
       }
-      /* Toast notifications styling */
       #toast {
         visibility: hidden;
         min-width: 250px;
-        background-color: #333;
+        background-color: #4A235A;
         color: #fff;
         text-align: center;
-        border-radius: 5px;
+        border-radius: 10px;
         padding: 16px;
         position: fixed;
         z-index: 1000;
@@ -115,93 +115,6 @@
       <button id="fullscreenBtn">Enter Fullscreen</button>
     </div>
 
-    <!-- Toast notification container -->
     <div id="toast"></div>
-
-    <script>
-      // Global state variables
-      let streamActive = true;
-      let notificationsMuted = false;
-      
-      // Display a toast notification if notifications are not muted
-      function showToast(message) {
-        if (notificationsMuted) return;
-        const toast = document.getElementById('toast');
-        toast.textContent = message;
-        toast.className = "show";
-        setTimeout(() => {
-          toast.className = toast.className.replace("show", "");
-        }, 3000);
-      }
-
-      // Capture the current frame from the video feed and download as PNG
-      function captureSnapshot() {
-        const videoImg = document.getElementById('videoFeed');
-        const canvas = document.createElement('canvas');
-        canvas.width = videoImg.clientWidth;
-        canvas.height = videoImg.clientHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(videoImg, 0, 0, canvas.width, canvas.height);
-        const dataURL = canvas.toDataURL('image/png');
-        const link = document.createElement('a');
-        link.href = dataURL;
-        link.download = 'snapshot.png';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        showToast("Snapshot captured!");
-      }
-
-      // Toggle the MJPEG stream on/off by modifying the image's src attribute
-      function toggleStream() {
-        const videoImg = document.getElementById('videoFeed');
-        const toggleBtn = document.getElementById('toggleBtn');
-        if (streamActive) {
-          videoImg.dataset.src = videoImg.src; // Save current src
-          videoImg.src = "";
-          streamActive = false;
-          toggleBtn.textContent = "Resume Stream";
-          showToast("Stream paused.");
-        } else {
-          videoImg.src = videoImg.dataset.src;
-          streamActive = true;
-          toggleBtn.textContent = "Pause Stream";
-          showToast("Stream resumed.");
-        }
-      }
-
-      // Toggle notifications on/off
-      function toggleMuteNotifications() {
-        const muteBtn = document.getElementById('muteBtn');
-        notificationsMuted = !notificationsMuted;
-        muteBtn.textContent = notificationsMuted ? "Unmute Notifications" : "Mute Notifications";
-        showToast(notificationsMuted ? "Notifications muted." : "Notifications unmuted.");
-      }
-
-      // Toggle fullscreen mode for the video container
-      function toggleFullscreen() {
-        const videoContainer = document.getElementById('videoContainer');
-        const fullscreenBtn = document.getElementById('fullscreenBtn');
-        if (!document.fullscreenElement) {
-          videoContainer.requestFullscreen().then(() => {
-            fullscreenBtn.textContent = "Exit Fullscreen";
-            showToast("Entered fullscreen mode.");
-          }).catch(err => {
-            console.error("Error attempting to enter fullscreen:", err);
-          });
-        } else {
-          document.exitFullscreen().then(() => {
-            fullscreenBtn.textContent = "Enter Fullscreen";
-            showToast("Exited fullscreen mode.");
-          });
-        }
-      }
-
-      // Attach event listeners to buttons
-      document.getElementById('captureBtn').addEventListener('click', captureSnapshot);
-      document.getElementById('toggleBtn').addEventListener('click', toggleStream);
-      document.getElementById('muteBtn').addEventListener('click', toggleMuteNotifications);
-      document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
-    </script>
   </body>
 </html>
