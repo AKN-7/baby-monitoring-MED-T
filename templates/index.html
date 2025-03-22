@@ -3,7 +3,9 @@
   <head>
     <meta charset="UTF-8">
     <title>Baby-Monitoring System - Real-Time Facial Emotion Recognition</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"><link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&display=swap" rel="stylesheet"><link href=https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
       * {
         box-sizing: border-box;
@@ -141,7 +143,7 @@
         transform: scale(1.03);
         transition: transform 0.3s ease;
       }
-      video {
+      .video-feed {
         width: 100%;
         height: auto;
         display: block;
@@ -318,7 +320,7 @@
 
     <div class="main-container">
       <div class="video-container">
-        <video id="video" autoplay playsinline></video>
+        <img id="videoFeed" class="video-feed" src="{{ url_for('video_feed') }}" alt="Video Feed">
       </div>
       <div class="controls">
         <button id="captureBtn">Capture Snapshot</button>
@@ -339,35 +341,72 @@
         }, 2500);
       });
 
-      // Video Stream
-      const video = document.getElementById('video');
-      const toggleBtn = document.getElementById('toggleBtn');
-      let streamActive = true;
-      
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(stream => {
-          video.srcObject = stream;
-        })
-        .catch(error => {
-          alert('Error accessing camera: ' + error.message);
-        });
-      
-      toggleBtn.addEventListener('click', () => {
-        if (streamActive) {
-          video.srcObject.getTracks().forEach(track => track.stop());
-          streamActive = false;
-          toggleBtn.textContent = 'Resume Stream';
-        } else {
-          navigator.mediaDevices.getUserMedia({ video: true })
-            .then(stream => {
-              video.srcObject = stream;
-              streamActive = true;
-              toggleBtn.textContent = 'Pause Stream';
-            })
-            .catch(error => {
-              alert('Error accessing camera: ' + error.message);
-            });
+      // Toast notification function
+      function showToast(message) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = 'show';
+      }
+
+      // Capture Snapshot
+      document.getElementById('captureBtn').addEventListener('click', () => {
+        fetch('/capture_snapshot', { method: 'POST' })
+          .then(response => response.json())
+          .then(data => {
+            if (data.status === 'success') {
+              showToast(data.message);
+            } else {
+              showToast('Error: ' + data.message);
+            }
+          })
+          .catch(error => {
+            showToast('Error capturing snapshot: ' + error.message);
+          });
+      });
+
+      // Pause/Resume Stream
+      let isPaused = false;
+      document.getElementById('toggleBtn').addEventListener('click', () => {
+        fetch('/toggle_stream', { method: 'POST' })
+          .then(response => response.json())
+          .then(data => {
+            isPaused = !data.streaming;
+            document.getElementById('toggleBtn').textContent = isPaused ? 'Resume Stream' : 'Pause Stream';
+            showToast(isPaused ? 'Stream Paused' : 'Stream Resumed');
+          })
+          .catch(error => {
+            showToast('Error toggling stream: ' + error.message);
+          });
+      });
+
+      // Mute Notifications
+      let isMuted = false;
+      document.getElementById('muteBtn').addEventListener('click', () => {
+        fetch('/mute_notifications', { method: 'POST' })
+          .then(response => response.json())
+          .then(data => {
+            isMuted = data.muted;
+            document.getElementById('muteBtn').textContent = isMuted ? 'Unmute Notifications' : 'Mute Notifications';
+            showToast(isMuted ? 'Notifications Muted' : 'Notifications Unmuted');
+          })
+          .catch(error => {
+            showToast('Error toggling notifications: ' + error.message);
+          });
+      });
+
+      // Enter Fullscreen
+      document.getElementById('fullscreenBtn').addEventListener('click', () => {
+        const videoContainer = document.querySelector('.video-container');
+        if (videoContainer.requestFullscreen) {
+          videoContainer.requestFullscreen();
+        } else if (videoContainer.mozRequestFullScreen) { /* Firefox */
+          videoContainer.mozRequestFullScreen();
+        } else if (videoContainer.webkitRequestFullscreen) { /* Chrome, Safari and Opera */
+          videoContainer.webkitRequestFullscreen();
+        } else if (videoContainer.msRequestFullscreen) { /* IE/Edge */
+          videoContainer.msRequestFullscreen();
         }
+        showToast('Entered Fullscreen');
       });
     </script>
   </body>
