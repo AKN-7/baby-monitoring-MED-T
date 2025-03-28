@@ -1,207 +1,781 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <title>Baby-Monitoring System - Real-Time Facial Emotion Recognition</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Inline CSS for a sleek, modern look -->
-    <style>
-      /* Overall page styling */
-      body {
-        background-color: #f4f7f6;
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
+<head>
+  <meta charset="UTF-8">
+  <title>BabyGuard - Emotional Monitoring System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    :root {
+      --primary-color: #4e73df;
+      --secondary-color: #2e59d9;
+      --success-color: #1cc88a;
+      --info-color: #36b9cc;
+      --warning-color: #f6c23e;
+      --danger-color: #e74a3b;
+      --dark-color: #2c3e50;
+      --light-color: #f8f9fc;
+      --border-radius: 0.5rem;
+      --box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+      --transition: all 0.3s ease-in-out;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      background-color: var(--light-color);
+      font-family: 'Nunito', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #434a54;
+    }
+    
+    /* Layout */
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+    
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+      color: white;
+      padding: 1.5rem 0;
+      box-shadow: var(--box-shadow);
+    }
+    
+    .header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .logo {
+      display: flex;
+      align-items: center;
+    }
+    
+    .logo i {
+      font-size: 2rem;
+      margin-right: 0.5rem;
+    }
+    
+    .logo-text h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin: 0;
+    }
+    
+    .logo-text p {
+      font-size: 0.875rem;
+      opacity: 0.9;
+    }
+    
+    /* Dashboard */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+      padding: 2rem 0;
+    }
+    
+    @media (min-width: 768px) {
+      .dashboard {
+        grid-template-columns: 1fr 300px;
       }
-      /* Header styling with product title */
-      .header {
-        width: 100%;
-        padding: 20px;
-        background-color: #2c3e50;
-        color: white;
-        text-align: center;
-      }
-      .header h1 {
-        margin: 0;
-        font-size: 2rem;
-      }
-      .header p {
-        margin: 5px 0 0;
-        font-size: 1.1rem;
-        opacity: 0.9;
-      }
-      /* Video container with a cool border and drop shadow */
-      .video-container {
-        margin-top: 30px;
-        border: 5px solid #3498db;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        width: 640px; /* scales down the video feed */
-        max-width: 90%;
-        position: relative;
-      }
-      .video-container img {
-        width: 100%;
-        height: auto;
-        display: block;
-      }
-      /* Controls styling */
+    }
+    
+    /* Card */
+    .card {
+      background: white;
+      border-radius: var(--border-radius);
+      box-shadow: var(--box-shadow);
+      overflow: hidden;
+    }
+    
+    .card-header {
+      background-color: var(--dark-color);
+      color: white;
+      padding: 1rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .card-body {
+      padding: 1.5rem;
+    }
+    
+    /* Video Feed */
+    .video-container {
+      position: relative;
+      overflow: hidden;
+      border-radius: 0.25rem;
+      background-color: #000;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .video-feed {
+      width: 100%;
+      height: auto;
+      display: block;
+      transition: var(--transition);
+    }
+    
+    .video-overlay {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      z-index: 10;
+    }
+    
+    .emotion-badge {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 2rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      z-index: 10;
+    }
+    
+    /* Info Panels */
+    .info-panel {
+      margin-bottom: 1.5rem;
+    }
+    
+    .info-panel h3 {
+      margin-bottom: 0.75rem;
+      font-size: 1.1rem;
+      color: var(--dark-color);
+    }
+    
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid #eaecef;
+    }
+    
+    .status-item:last-child {
+      border-bottom: none;
+    }
+    
+    .status-label {
+      color: #5a5c69;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .status-value {
+      font-weight: 600;
+    }
+    
+    /* Controls */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+    
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: var(--border-radius);
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      color: white;
+      background-color: var(--primary-color);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .btn:active {
+      transform: translateY(0);
+    }
+    
+    .btn i {
+      font-size: 1rem;
+    }
+    
+    .btn-primary {
+      background-color: var(--primary-color);
+    }
+    
+    .btn-secondary {
+      background-color: var(--secondary-color);
+    }
+    
+    .btn-info {
+      background-color: var(--info-color);
+    }
+    
+    .btn-success {
+      background-color: var(--success-color);
+    }
+    
+    .btn-warning {
+      background-color: var(--warning-color);
+      color: #212529;
+    }
+    
+    .btn-danger {
+      background-color: var(--danger-color);
+    }
+    
+    /* Toast Notification */
+    #toast-container {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    
+    .toast {
+      min-width: 250px;
+      max-width: 350px;
+      background-color: #fff;
+      color: #212529;
+      border-radius: var(--border-radius);
+      padding: 1rem;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transform: translateX(100%);
+      opacity: 0;
+      transition: transform 0.5s ease, opacity 0.5s ease;
+    }
+    
+    .toast.show {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    
+    .toast i {
+      font-size: 1.25rem;
+      margin-right: 0.75rem;
+    }
+    
+    .toast-close {
+      background: none;
+      border: none;
+      color: #99a0ac;
+      cursor: pointer;
+      font-size: 1.25rem;
+      transition: color 0.2s;
+    }
+    
+    .toast-close:hover {
+      color: #434a54;
+    }
+    
+    .toast-success { border-left: 4px solid var(--success-color); }
+    .toast-success i { color: var(--success-color); }
+    
+    .toast-info { border-left: 4px solid var(--info-color); }
+    .toast-info i { color: var(--info-color); }
+    
+    .toast-warning { border-left: 4px solid var(--warning-color); }
+    .toast-warning i { color: var(--warning-color); }
+    
+    .toast-danger { border-left: 4px solid var(--danger-color); }
+    .toast-danger i { color: var(--danger-color); }
+    
+    /* Footer */
+    .footer {
+      background-color: var(--dark-color);
+      color: white;
+      padding: 1.5rem 0;
+      margin-top: auto;
+      text-align: center;
+      font-size: 0.875rem;
+    }
+    
+    /* Keyframes */
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+    
+    /* Responsive Adjustments */
+    @media (max-width: 767px) {
       .controls {
-        margin-top: 20px;
-        text-align: center;
+        justify-content: center;
       }
-      .controls button {
-        background-color: #3498db;
-        border: none;
-        color: white;
-        padding: 10px 20px;
-        font-size: 1rem;
-        margin: 5px 10px;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: background-color 0.3s ease;
-      }
-      .controls button:hover {
-        background-color: #2980b9;
-      }
-      /* Toast notifications styling */
-      #toast {
-        visibility: hidden;
-        min-width: 250px;
-        background-color: #333;
-        color: #fff;
-        text-align: center;
-        border-radius: 5px;
-        padding: 16px;
-        position: fixed;
-        z-index: 1000;
-        left: 50%;
-        bottom: 30px;
-        font-size: 17px;
-        transform: translateX(-50%);
-      }
-      #toast.show {
-        visibility: visible;
-        animation: fadein 0.5s, fadeout 0.5s 2.5s;
-      }
-      @keyframes fadein {
-        from { bottom: 0; opacity: 0; } 
-        to { bottom: 30px; opacity: 1; }
-      }
-      @keyframes fadeout {
-        from { bottom: 30px; opacity: 1; }
-        to { bottom: 0; opacity: 0; }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="header">
-      <h1>Emotion Monitor</h1>
-      <p>Real-Time Facial Emotion Recognition</p>
-    </div>
-
-    <div class="video-container" id="videoContainer">
-      <img id="videoFeed" src="{{ url_for('video_feed') }}" alt="Live Video Stream">
-    </div>
-
-    <div class="controls">
-      <button id="captureBtn">Capture Snapshot</button>
-      <button id="toggleBtn">Pause Stream</button>
-      <button id="muteBtn">Mute Notifications</button>
-      <button id="fullscreenBtn">Enter Fullscreen</button>
-    </div>
-
-    <!-- Toast notification container -->
-    <div id="toast"></div>
-
-    <script>
-      // Global state variables
-      let streamActive = true;
-      let notificationsMuted = false;
       
-      // Display a toast notification if notifications are not muted
-      function showToast(message) {
-        if (notificationsMuted) return;
-        const toast = document.getElementById('toast');
-        toast.textContent = message;
-        toast.className = "show";
-        setTimeout(() => {
-          toast.className = toast.className.replace("show", "");
-        }, 3000);
+      .card-header {
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
       }
-
-      // Capture the current frame from the video feed and download as PNG
-      function captureSnapshot() {
-        const videoImg = document.getElementById('videoFeed');
-        const canvas = document.createElement('canvas');
-        canvas.width = videoImg.clientWidth;
-        canvas.height = videoImg.clientHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(videoImg, 0, 0, canvas.width, canvas.height);
-        const dataURL = canvas.toDataURL('image/png');
-        const link = document.createElement('a');
-        link.href = dataURL;
-        link.download = 'snapshot.png';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        showToast("Snapshot captured!");
+      
+      .status-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
       }
-
-      // Toggle the MJPEG stream on/off by modifying the image's src attribute
-      function toggleStream() {
-        const videoImg = document.getElementById('videoFeed');
-        const toggleBtn = document.getElementById('toggleBtn');
+    }
+  </style>
+</head>
+<body>
+  <div class="main-content">
+    <!-- Header -->
+    <header class="header">
+      <div class="container header-content">
+        <div class="logo">
+          <i class="fas fa-baby"></i>
+          <div class="logo-text">
+            <h1>BabyGuard</h1>
+            <p>Intelligent Monitoring System</p>
+          </div>
+        </div>
+        <div class="header-status">
+          <span id="connection-status">
+            <i class="fas fa-circle text-success"></i> Live
+          </span>
+        </div>
+      </div>
+    </header>
+    
+    <!-- Dashboard -->
+    <div class="container">
+      <div class="dashboard">
+        <!-- Main Video Feed -->
+        <div class="card">
+          <div class="card-header">
+            <span><i class="fas fa-video"></i> Live Monitor</span>
+            <span id="current-time"></span>
+          </div>
+          <div class="card-body">
+            <div class="video-container">
+              <img id="videoFeed" class="video-feed" src="{{ url_for('video_feed') }}" alt="Live Video Stream">
+              <div id="emotion-badge" class="emotion-badge">
+                <i class="fas fa-smile"></i> <span id="emotion-text">Detecting...</span>
+              </div>
+              <div class="video-overlay">
+                <button id="fullscreenBtn" class="btn btn-info" title="Toggle fullscreen">
+                  <i class="fas fa-expand"></i>
+                </button>
+              </div>
+            </div>
+            
+            <div class="controls">
+              <button id="captureBtn" class="btn btn-primary">
+                <i class="fas fa-camera"></i> Capture
+              </button>
+              <button id="toggleBtn" class="btn btn-secondary">
+                <i class="fas fa-pause"></i> Pause
+              </button>
+              <button id="muteBtn" class="btn btn-warning">
+                <i class="fas fa-bell"></i> Mute Alerts
+              </button>
+              <button id="testAlertBtn" class="btn btn-danger">
+                <i class="fas fa-bell"></i> Test Alert
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Info Panels -->
+        <div>
+          <!-- System Status -->
+          <div class="card info-panel">
+            <div class="card-header">
+              <span><i class="fas fa-info-circle"></i> System Status</span>
+            </div>
+            <div class="card-body">
+              <div class="status-item">
+                <div class="status-label"><i class="fas fa-video"></i> Camera</div>
+                <div id="camera-status" class="status-value">Connected</div>
+              </div>
+              <div class="status-item">
+                <div class="status-label"><i class="fas fa-brain"></i> AI Model</div>
+                <div id="model-status" class="status-value">Online</div>
+              </div>
+              <div class="status-item">
+                <div class="status-label"><i class="fas fa-bell"></i> Alert System</div>
+                <div id="alert-status" class="status-value">Active</div>
+              </div>
+              <div class="status-item">
+                <div class="status-label"><i class="fas fa-mobile-alt"></i> Notifications</div>
+                <div id="notification-status" class="status-value">Enabled</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Recent Activity -->
+          <div class="card info-panel">
+            <div class="card-header">
+              <span><i class="fas fa-history"></i> Recent Activity</span>
+            </div>
+            <div class="card-body">
+              <div id="activity-log">
+                <div class="status-item">
+                  <div class="status-label">System started</div>
+                  <div class="status-value" id="start-time">Just now</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <p>&copy; 2025 BabyGuard Monitoring System. All rights reserved.</p>
+      </div>
+    </footer>
+  </div>
+  
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+  
+  <script>
+    // Global state variables
+    let streamActive = true;
+    let notificationsMuted = false;
+    let activityLog = [];
+    let lastEmotion = "Normal";
+    
+    // Element references
+    const videoFeed = document.getElementById('videoFeed');
+    const toggleBtn = document.getElementById('toggleBtn');
+    const muteBtn = document.getElementById('muteBtn');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const captureBtn = document.getElementById('captureBtn');
+    const testAlertBtn = document.getElementById('testAlertBtn');
+    const emotionText = document.getElementById('emotion-text');
+    const emotionBadge = document.getElementById('emotion-badge');
+    const currentTimeEl = document.getElementById('current-time');
+    const startTimeEl = document.getElementById('start-time');
+    const activityLogEl = document.getElementById('activity-log');
+    const cameraStatusEl = document.getElementById('camera-status');
+    const alertStatusEl = document.getElementById('alert-status');
+    const notificationStatusEl = document.getElementById('notification-status');
+    
+    // Initialize the application
+    function init() {
+      // Set up current time display
+      updateTime();
+      setInterval(updateTime, 1000);
+      
+      // Record start time
+      const startTime = new Date();
+      startTimeEl.textContent = formatTime(startTime);
+      
+      // Add initial activity
+      addActivity("System initialized");
+      addActivity("Camera connected");
+      addActivity("AI model loaded");
+      
+      // Set up event listeners
+      toggleBtn.addEventListener('click', toggleStream);
+      muteBtn.addEventListener('click', toggleMuteNotifications);
+      fullscreenBtn.addEventListener('click', toggleFullscreen);
+      captureBtn.addEventListener('click', captureSnapshot);
+      testAlertBtn.addEventListener('click', () => testAlert());
+      
+      // Set up video feed error handling
+      videoFeed.addEventListener('error', handleVideoError);
+      videoFeed.addEventListener('load', handleVideoLoad);
+      
+      // Simulate emotion updates
+      simulateEmotionUpdates();
+    }
+    
+    // Update the current time display
+    function updateTime() {
+      const now = new Date();
+      currentTimeEl.textContent = now.toLocaleTimeString();
+    }
+    
+    // Format time for display
+    function formatTime(date) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    // Add an activity to the log
+    function addActivity(message) {
+      const now = new Date();
+      const activity = {
+        message,
+        time: now
+      };
+      
+      activityLog.unshift(activity);
+      if (activityLog.length > 5) {
+        activityLog.pop();
+      }
+      
+      updateActivityLog();
+    }
+    
+    // Update the activity log display
+    function updateActivityLog() {
+      activityLogEl.innerHTML = '';
+      
+      activityLog.forEach(activity => {
+        const item = document.createElement('div');
+        item.className = 'status-item';
+        
+        const label = document.createElement('div');
+        label.className = 'status-label';
+        label.textContent = activity.message;
+        
+        const value = document.createElement('div');
+        value.className = 'status-value';
+        value.textContent = formatTime(activity.time);
+        
+        item.appendChild(label);
+        item.appendChild(value);
+        activityLogEl.appendChild(item);
+      });
+    }
+    
+    // Simulate emotion updates for demo purposes
+    function simulateEmotionUpdates() {
+      const emotions = ['Happy', 'Neutral', 'Sad', 'Fear', 'Surprise', 'Neutral', 'Happy'];
+      let idx = 0;
+      
+      setInterval(() => {
         if (streamActive) {
-          videoImg.dataset.src = videoImg.src; // Save current src
-          videoImg.src = "";
-          streamActive = false;
-          toggleBtn.textContent = "Resume Stream";
-          showToast("Stream paused.");
-        } else {
-          videoImg.src = videoImg.dataset.src;
-          streamActive = true;
-          toggleBtn.textContent = "Pause Stream";
-          showToast("Stream resumed.");
+          updateEmotion(emotions[idx]);
+          idx = (idx + 1) % emotions.length;
         }
-      }
-
-      // Toggle notifications on/off
-      function toggleMuteNotifications() {
-        const muteBtn = document.getElementById('muteBtn');
-        notificationsMuted = !notificationsMuted;
-        muteBtn.textContent = notificationsMuted ? "Unmute Notifications" : "Mute Notifications";
-        showToast(notificationsMuted ? "Notifications muted." : "Notifications unmuted.");
-      }
-
-      // Toggle fullscreen mode for the video container
-      function toggleFullscreen() {
-        const videoContainer = document.getElementById('videoContainer');
-        const fullscreenBtn = document.getElementById('fullscreenBtn');
-        if (!document.fullscreenElement) {
-          videoContainer.requestFullscreen().then(() => {
-            fullscreenBtn.textContent = "Exit Fullscreen";
-            showToast("Entered fullscreen mode.");
-          }).catch(err => {
-            console.error("Error attempting to enter fullscreen:", err);
-          });
-        } else {
-          document.exitFullscreen().then(() => {
-            fullscreenBtn.textContent = "Enter Fullscreen";
-            showToast("Exited fullscreen mode.");
-          });
+      }, 5000);
+    }
+    
+    // Update the emotion display
+    function updateEmotion(emotion) {
+      emotionText.textContent = emotion;
+      
+      // Remove all existing classes
+      emotionBadge.className = 'emotion-badge';
+      
+      // Add appropriate class based on emotion
+      if (emotion.toLowerCase() === 'happy') {
+        emotionBadge.classList.add('toast-success');
+        emotionBadge.querySelector('i').className = 'fas fa-smile';
+      } else if (emotion.toLowerCase() === 'sad') {
+        emotionBadge.classList.add('toast-warning');
+        emotionBadge.querySelector('i').className = 'fas fa-frown';
+        if (lastEmotion !== 'sad') {
+          addActivity("Detected sad expression");
+          showToast('warning', 'Baby appears to be sad', 'Please check if needed');
         }
+      } else if (emotion.toLowerCase() === 'fear') {
+        emotionBadge.classList.add('toast-danger');
+        emotionBadge.classList.add('pulse');
+        emotionBadge.querySelector('i').className = 'fas fa-grimace';
+        if (lastEmotion !== 'fear') {
+          addActivity("Detected distress!");
+          showToast('danger', 'Baby appears distressed!', 'Immediate attention needed', true);
+        }
+      } else if (emotion.toLowerCase() === 'surprise') {
+        emotionBadge.classList.add('toast-info');
+        emotionBadge.querySelector('i').className = 'fas fa-surprise';
+      } else {
+        emotionBadge.querySelector('i').className = 'fas fa-meh';
       }
-
-      // Attach event listeners to buttons
-      document.getElementById('captureBtn').addEventListener('click', captureSnapshot);
-      document.getElementById('toggleBtn').addEventListener('click', toggleStream);
-      document.getElementById('muteBtn').addEventListener('click', toggleMuteNotifications);
-      document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
-    </script>
-  </body>
+      
+      lastEmotion = emotion.toLowerCase();
+    }
+    
+    // Show a toast notification if notifications are not muted
+    function showToast(type, title, message, urgent = false) {
+      if (notificationsMuted && !urgent) return;
+      
+      const toastContainer = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type} show`;
+      
+      let icon;
+      switch (type) {
+        case 'success': icon = 'fas fa-check-circle'; break;
+        case 'warning': icon = 'fas fa-exclamation-triangle'; break;
+        case 'danger': icon = 'fas fa-exclamation-circle'; break;
+        default: icon = 'fas fa-info-circle';
+      }
+      
+      toast.innerHTML = `
+        <div class="toast-content">
+          <i class="${icon}"></i>
+          <div>
+            <strong>${title}</strong>
+            <div>${message}</div>
+          </div>
+        </div>
+        <button class="toast-close">&times;</button>
+      `;
+      
+      toastContainer.appendChild(toast);
+      
+      // Auto-remove after delay unless urgent
+      if (!urgent) {
+        setTimeout(() => {
+          toast.classList.remove('show');
+          setTimeout(() => {
+            toastContainer.removeChild(toast);
+          }, 500);
+        }, 4000);
+      }
+      
+      // Add close button functionality
+      toast.querySelector('.toast-close').addEventListener('click', () => {
+        toast.classList.remove('show');
+        setTimeout(() => {
+          toastContainer.removeChild(toast);
+        }, 500);
+      });
+    }
+    
+    // Test alert functionality
+    function testAlert() {
+      addActivity("Test alert triggered");
+      showToast('danger', 'Test Alert', 'This is a test of the alert system', true);
+    }
+    
+    // Handle video feed error
+    function handleVideoError() {
+      cameraStatusEl.textContent = 'Error';
+      cameraStatusEl.style.color = 'var(--danger-color)';
+      addActivity("Camera connection error");
+      showToast('danger', 'Camera Error', 'Unable to connect to camera feed');
+    }
+    
+    // Handle video feed load
+    function handleVideoLoad() {
+      cameraStatusEl.textContent = 'Connected';
+      cameraStatusEl.style.color = 'var(--success-color)';
+    }
+    
+    // Capture a snapshot from the video feed
+    function captureSnapshot() {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoFeed.naturalWidth || videoFeed.width;
+      canvas.height = videoFeed.naturalHeight || videoFeed.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(videoFeed, 0, 0, canvas.width, canvas.height);
+      
+      const dataURL = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = dataURL;
+      link.download = `babyguard-${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      addActivity("Snapshot captured");
+      showToast('success', 'Snapshot Captured', 'Image saved to your downloads');
+    }
+    
+    // Toggle the video stream on/off
+    function toggleStream() {
+      if (streamActive) {
+        videoFeed.dataset.src = videoFeed.src;
+        videoFeed.src = "";
+        streamActive = false;
+        toggleBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
+        addActivity("Stream paused");
+        showToast('info', 'Stream Paused', 'Live video feed has been paused');
+      } else {
+        videoFeed.src = videoFeed.dataset.src;
+        streamActive = true;
+        toggleBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+        addActivity("Stream resumed");
+        showToast('success', 'Stream Resumed', 'Live video feed is active');
+      }
+    }
+    
+    // Toggle notifications on/off
+    function toggleMuteNotifications() {
+      notificationsMuted = !notificationsMuted;
+      
+      if (notificationsMuted) {
+        muteBtn.innerHTML = '<i class="fas fa-bell-slash"></i> Unmute';
+        notificationStatusEl.textContent = 'Muted';
+        notificationStatusEl.style.color = 'var(--warning-color)';
+        addActivity("Notifications muted");
+        showToast('warning', 'Notifications Muted', 'You will not receive non-urgent alerts');
+      } else {
+        muteBtn.innerHTML = '<i class="fas fa-bell"></i> Mute';
+        notificationStatusEl.textContent = 'Enabled';
+        notificationStatusEl.style.color = 'var(--success-color)';
+        addActivity("Notifications enabled");
+        showToast('success', 'Notifications Enabled', 'You will receive all alerts');
+      }
+    }
+    
+    // Toggle fullscreen mode for the video container
+    function toggleFullscreen() {
+      const videoContainer = document.querySelector('.video-container');
+      
+      if (!document.fullscreenElement) {
+        videoContainer.requestFullscreen().catch(err => {
+          showToast('warning', 'Fullscreen Error', err.message);
+        });
+      } else {
+        document.exitFullscreen();
+      }
+    }
+    
+    // Document loaded - initialize the app
+    document.addEventListener('DOMContentLoaded', init);
+    
+    // Handle fullscreen change events
+    document.addEventListener('fullscreenchange', () => {
+      if (document.fullscreenElement) {
+        fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
+        addActivity("Entered fullscreen mode");
+      } else {
+        fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
+        addActivity("Exited fullscreen mode");
+      }
+    });
+  </script>
+</body>
 </html>
