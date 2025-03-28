@@ -8,9 +8,16 @@ from transformers import AutoFeatureExtractor, AutoModelForImageClassification
 from PIL import Image
 import mediapipe as mp
 from scipy.spatial import distance as dist
-import picamera
 from io import BytesIO
-from PCA9685 import PCA9685  # Add PCA9685 import
+
+# Detect if running on Raspberry Pi
+try:
+    import picamera
+    from PCA9685 import PCA9685
+    IS_RASPBERRY_PI = True
+except ImportError:
+    IS_RASPBERRY_PI = False
+    print("[INFO] Not on Raspberry Pi - using webcam and skipping servo control")
 
 # --- Flask Setup ---
 app = Flask(__name__)
@@ -25,13 +32,16 @@ except Exception as e:
     print(f"[ERROR] Failed to load model: {e}")
     exit()
 
-# --- Servo Setup for Pan-Tilt with PCA9685 ---
-try:
-    pwm = PCA9685()
-    pwm.setPWMFreq(50)  # Set frequency to 50Hz
-except OSError as e:
-    print("Error initializing PCA9685: ", e)
-    exit()
+# --- Servo Setup for Pan-Tilt with PCA9685 (Raspberry Pi only) ---
+if IS_RASPBERRY_PI:
+    try:
+        pwm = PCA9685()
+        pwm.setPWMFreq(50)  # Set frequency to 50Hz
+    except OSError as e:
+        print("Error initializing PCA9685: ", e)
+        exit()
+else:
+    pwm = None  # No servo control on desktop
 
 # --- MediaPipe Setup ---
 mp_face_mesh = mp.solutions.face_mesh
@@ -46,7 +56,7 @@ tilt_angle = 90
 MAX_ANGLE = 180
 MIN_ANGLE = 0
 
-# Helper functions for facial feature analysis (unchanged)
+# Helper functions for facial feature analysis
 def eye_aspect_ratio(eye_points, landmarks, image_shape):
     h, w = image_shape[:2]
     eye = [(int(landmarks[p].x * w), int(landmarks[p].y * h)) for p in eye_points]
@@ -65,18 +75,15 @@ def mouth_aspect_ratio(mouth_points, landmarks, image_shape):
     mar = (A + B) / (2.0 * C)
     return mar
 
-# Modified servo control function for PCA9685
+# Servo control function (only active on Raspberry Pi)
 def set_servo_angle(channel, angle):
-    if MIN_ANGLE <= angle <= MAX_ANGLE:
+    if IS_RASPBERRY_PI and pwm is not None and MIN_ANGLE <= angle <= MAX_ANGLE:
         pwm.setRotationAngle(channel, angle)
+    elif not IS_RASPBERRY_PI:
+        print(f"[SIM] Would set channel {channel} to {angle}°")
 
 def gen_frames():
     global is_streaming, mute_notifications, pan_angle, tilt_angle
-
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    if face_cascade.empty():
-        print("[ERROR] Failed to load Haar Cascade Classifier")
-        exit()
 
     LEFT_EYE_POINTS = [33, 160, 158, 133, 153, 144]
     RIGHT_EYE_POINTS = [362, 385, 387, 263, 373, 380]
@@ -85,16 +92,24 @@ def gen_frames():
     EAR_THRESHOLD_TIGHT = 0.2
     MAR_THRESHOLD_OPEN = 0.7
 
-    with picamera.PiCamera() as camera:
+    if IS_RASPBERRY_PI:
+        # Raspberry Pi camera setup
+        camera = picamera.PiCamera()
         camera.resolution = (320, 240)
         camera.framerate = 24
         stream = BytesIO()
+        set_servo_angle(0, pan_angle)  # Initialize pan
+        set_servo_angle(1, tilt_angle)  # Initialize tilt
+        capture_method = camera.capture_continuous(stream, format='jpeg', use_video_port=True)
+    else:
+        # Desktop webcam setup
+        camera = cv2.VideoCapture(0)  # Default webcam
+        camera.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+        camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+        capture_method = None
 
-        # Initialize servos to center position
-        set_servo_angle(0, pan_angle)  # Channel 0 for pan
-        set_servo_angle(1, tilt_angle)  # Channel 1 for tilt
-
-        for _ in camera.capture_continuous(stream, format='jpeg', use_video_port=True):
+    try:
+        while True:
             if not is_streaming:
                 frame = np.zeros((240, 320, 3), dtype=np.uint8)
                 cv2.putText(frame, "Stream Paused", (50, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
@@ -102,50 +117,60 @@ def gen_frames():
                 frame_bytes = buffer.tobytes()
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-                stream.seek(0)
-                stream.truncate()
+                if IS_RASPBERRY_PI:
+                    stream.seek(0)
+                    stream.truncate()
                 continue
 
-            # Read frame from stream
-            stream.seek(0)
-            data = np.frombuffer(stream.getvalue(), dtype=np.uint8)
-            frame = cv2.imdecode(data, cv2.IMREAD_COLOR)
-            stream.seek(0)
-            stream.truncate()
+            # Capture frame
+            if IS_RASPBERRY_PI:
+                next(capture_method)  # Advance the capture_continuous iterator
+                stream.seek(0)
+                data = np.frombuffer(stream.getvalue(), dtype=np.uint8)
+                frame = cv2.imdecode(data, cv2.IMREAD_COLOR)
+                stream.seek(0)
+                stream.truncate()
+            else:
+                ret, frame = camera.read()
+                if not ret:
+                    print("[ERROR] Failed to capture frame from webcam")
+                    break
 
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=5, minSize=(30, 30))
+            # Convert to RGB for MediaPipe
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = face_mesh.process(frame_rgb)
 
             predicted_label = "None"
             distress_details = []
 
-            # Face tracking with pan-tilt using PCA9685
-            if len(faces) > 0:
-                (x, y, w, h) = faces[0]
-                face_center_x = x + w // 2
-                face_center_y = y + h // 2
-                frame_center_x = frame.shape[1] // 2
-                frame_center_y = frame.shape[0] // 2
-
-                # Adjust pan and tilt based on face position
-                if face_center_x < frame_center_x - 20:
-                    pan_angle = min(MAX_ANGLE, pan_angle + 2)
-                elif face_center_x > frame_center_x + 20:
-                    pan_angle = max(MIN_ANGLE, pan_angle - 2)
-                if face_center_y < frame_center_y - 20:
-                    tilt_angle = min(MAX_ANGLE, tilt_angle + 2)
-                elif face_center_y > frame_center_y + 20:
-                    tilt_angle = max(MIN_ANGLE, tilt_angle - 2)
-
-                set_servo_angle(0, pan_angle)  # Channel 0 for pan
-                set_servo_angle(1, tilt_angle)  # Channel 1 for tilt
-
-            # Rest of the facial analysis code remains the same...
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = face_mesh.process(frame_rgb)
-
+            # Face tracking and analysis using MediaPipe
             if results.multi_face_landmarks:
                 for face_landmarks in results.multi_face_landmarks:
+                    h, w = frame.shape[:2]
+                    # Calculate bounding box from landmarks
+                    x_coords = [int(lm.x * w) for lm in face_landmarks.landmark]
+                    y_coords = [int(lm.y * h) for lm in face_landmarks.landmark]
+                    x_min, x_max = min(x_coords), max(x_coords)
+                    y_min, y_max = min(y_coords), max(y_coords)
+                    face_center_x = (x_min + x_max) // 2
+                    face_center_y = (y_min + y_max) // 2
+                    frame_center_x = w // 2
+                    frame_center_y = h // 2
+
+                    # Adjust pan and tilt
+                    if face_center_x < frame_center_x - 20:
+                        pan_angle = min(MAX_ANGLE, pan_angle + 2)
+                    elif face_center_x > frame_center_x + 20:
+                        pan_angle = max(MIN_ANGLE, pan_angle - 2)
+                    if face_center_y < frame_center_y - 20:
+                        tilt_angle = min(MAX_ANGLE, tilt_angle + 2)
+                    elif face_center_y > frame_center_y + 20:
+                        tilt_angle = max(MIN_ANGLE, tilt_angle - 2)
+
+                    set_servo_angle(0, pan_angle)
+                    set_servo_angle(1, tilt_angle)
+
+                    # Facial analysis
                     left_ear = eye_aspect_ratio(LEFT_EYE_POINTS, face_landmarks.landmark, frame.shape)
                     right_ear = eye_aspect_ratio(RIGHT_EYE_POINTS, face_landmarks.landmark, frame.shape)
                     avg_ear = (left_ear + right_ear) / 2.0
@@ -160,17 +185,18 @@ def gen_frames():
                     else:
                         distress_details.append("Mouth: Closed/Normal")
 
-            for (x, y, w, h) in faces:
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                pil_image = Image.fromarray(frame_rgb)
-                inputs = feature_extractor(images=pil_image, return_tensors="pt")
-                with torch.no_grad():
-                    outputs = model(**inputs)
-                logits = outputs.logits
-                predicted_class_idx = logits.argmax(-1).item()
-                predicted_label = model.config.id2label[predicted_class_idx].split("_")[-1]
-                break
+                    # Draw bounding box
+                    cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (255, 0, 0), 2)
+
+                    # Emotion detection
+                    pil_image = Image.fromarray(frame_rgb)
+                    inputs = feature_extractor(images=pil_image, return_tensors="pt")
+                    with torch.no_grad():
+                        outputs = model(**inputs)
+                    logits = outputs.logits
+                    predicted_class_idx = logits.argmax(-1).item()
+                    predicted_label = model.config.id2label[predicted_class_idx].split("_")[-1]
+                    break  # Only process the first face
 
             is_distressed = predicted_label.lower() in ["sad", "fear"] or \
                            (distress_details and ("Tightly Closed" in distress_details[0] or "Wide Open" in distress_details[1]))
@@ -187,7 +213,13 @@ def gen_frames():
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
-# Flask routes remain unchanged
+    finally:
+        if IS_RASPBERRY_PI:
+            camera.close()
+        else:
+            camera.release()
+
+# Flask routes
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -210,15 +242,22 @@ def toggle_notifications():
 
 @app.route('/capture_snapshot', methods=['POST'])
 def capture_snapshot():
-    with picamera.PiCamera() as camera:
-        camera.resolution = (320, 240)
-        snapshot_path = f"snapshot_{int(time.time())}.jpg"
-        camera.capture(snapshot_path)
-        return {"status": "success", "message": f"Snapshot saved as {snapshot_path}"}
+    if IS_RASPBERRY_PI:
+        with picamera.PiCamera() as camera:
+            camera.resolution = (320, 240)
+            snapshot_path = f"snapshot_{int(time.time())}.jpg"
+            camera.capture(snapshot_path)
+    else:
+        camera = cv2.VideoCapture(0)
+        ret, frame = camera.read()
+        if ret:
+            snapshot_path = f"snapshot_{int(time.time())}.jpg"
+            cv2.imwrite(snapshot_path, frame)
+        camera.release()
+    return {"status": "success", "message": f"Snapshot saved as {snapshot_path}"}
 
 if __name__ == '__main__':
     try:
         app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
     finally:
-        # No GPIO cleanup needed with PCA9685
         pass
