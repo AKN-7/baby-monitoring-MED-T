@@ -9,8 +9,8 @@ from PIL import Image
 import mediapipe as mp
 from scipy.spatial import distance as dist
 import picamera
-import RPi.GPIO as GPIO
 from io import BytesIO
+from PCA9685 import PCA9685  # Add PCA9685 import
 
 # --- Flask Setup ---
 app = Flask(__name__)
@@ -25,17 +25,13 @@ except Exception as e:
     print(f"[ERROR] Failed to load model: {e}")
     exit()
 
-# --- Servo Setup for Pan-Tilt ---
-GPIO.setmode(GPIO.BCM)
-PAN_PIN = 18  # GPIO pin for pan servo
-TILT_PIN = 23  # GPIO pin for tilt servo
-GPIO.setup(PAN_PIN, GPIO.OUT)
-GPIO.setup(TILT_PIN, GPIO.OUT)
-
-pan_servo = GPIO.PWM(PAN_PIN, 50)  # 50Hz PWM
-tilt_servo = GPIO.PWM(TILT_PIN, 50)
-pan_servo.start(7.5)  # Center position (7.5% duty cycle)
-tilt_servo.start(7.5)
+# --- Servo Setup for Pan-Tilt with PCA9685 ---
+try:
+    pwm = PCA9685()
+    pwm.setPWMFreq(50)  # Set frequency to 50Hz
+except OSError as e:
+    print("Error initializing PCA9685: ", e)
+    exit()
 
 # --- MediaPipe Setup ---
 mp_face_mesh = mp.solutions.face_mesh
@@ -47,8 +43,10 @@ is_streaming = True
 mute_notifications = False
 pan_angle = 90  # Center position (0-180 degrees)
 tilt_angle = 90
+MAX_ANGLE = 180
+MIN_ANGLE = 0
 
-# Helper functions for facial feature analysis
+# Helper functions for facial feature analysis (unchanged)
 def eye_aspect_ratio(eye_points, landmarks, image_shape):
     h, w = image_shape[:2]
     eye = [(int(landmarks[p].x * w), int(landmarks[p].y * h)) for p in eye_points]
@@ -67,12 +65,10 @@ def mouth_aspect_ratio(mouth_points, landmarks, image_shape):
     mar = (A + B) / (2.0 * C)
     return mar
 
-# Servo control function
-def set_servo_angle(servo, angle):
-    duty = 2.5 + (angle / 18.0)  # Convert angle (0-180) to duty cycle (2.5-12.5)
-    servo.ChangeDutyCycle(duty)
-    time.sleep(0.05)  # Allow servo to move
-    servo.ChangeDutyCycle(0)  # Stop signal to prevent jitter
+# Modified servo control function for PCA9685
+def set_servo_angle(channel, angle):
+    if MIN_ANGLE <= angle <= MAX_ANGLE:
+        pwm.setRotationAngle(channel, angle)
 
 def gen_frames():
     global is_streaming, mute_notifications, pan_angle, tilt_angle
@@ -90,9 +86,13 @@ def gen_frames():
     MAR_THRESHOLD_OPEN = 0.7
 
     with picamera.PiCamera() as camera:
-        camera.resolution = (320, 240)  # Lower resolution for better performance
+        camera.resolution = (320, 240)
         camera.framerate = 24
         stream = BytesIO()
+
+        # Initialize servos to center position
+        set_servo_angle(0, pan_angle)  # Channel 0 for pan
+        set_servo_angle(1, tilt_angle)  # Channel 1 for tilt
 
         for _ in camera.capture_continuous(stream, format='jpeg', use_video_port=True):
             if not is_streaming:
@@ -119,7 +119,7 @@ def gen_frames():
             predicted_label = "None"
             distress_details = []
 
-            # Face tracking with pan-tilt
+            # Face tracking with pan-tilt using PCA9685
             if len(faces) > 0:
                 (x, y, w, h) = faces[0]
                 face_center_x = x + w // 2
@@ -129,18 +129,18 @@ def gen_frames():
 
                 # Adjust pan and tilt based on face position
                 if face_center_x < frame_center_x - 20:
-                    pan_angle = min(180, pan_angle + 2)
+                    pan_angle = min(MAX_ANGLE, pan_angle + 2)
                 elif face_center_x > frame_center_x + 20:
-                    pan_angle = max(0, pan_angle - 2)
+                    pan_angle = max(MIN_ANGLE, pan_angle - 2)
                 if face_center_y < frame_center_y - 20:
-                    tilt_angle = min(180, tilt_angle + 2)
+                    tilt_angle = min(MAX_ANGLE, tilt_angle + 2)
                 elif face_center_y > frame_center_y + 20:
-                    tilt_angle = max(0, tilt_angle - 2)
+                    tilt_angle = max(MIN_ANGLE, tilt_angle - 2)
 
-                set_servo_angle(pan_servo, pan_angle)
-                set_servo_angle(tilt_servo, tilt_angle)
+                set_servo_angle(0, pan_angle)  # Channel 0 for pan
+                set_servo_angle(1, tilt_angle)  # Channel 1 for tilt
 
-            # Facial landmark detection
+            # Rest of the facial analysis code remains the same...
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = face_mesh.process(frame_rgb)
 
@@ -187,6 +187,7 @@ def gen_frames():
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
+# Flask routes remain unchanged
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -219,6 +220,5 @@ if __name__ == '__main__':
     try:
         app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
     finally:
-        pan_servo.stop()
-        tilt_servo.stop()
-        GPIO.cleanup()
+        # No GPIO cleanup needed with PCA9685
+        pass
